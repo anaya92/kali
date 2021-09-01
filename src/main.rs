@@ -65,6 +65,7 @@ impl Core {
             .build()
             .unwrap();
         
+        // init hardware renderer
         let mut canvas = window.into_canvas().build().unwrap();
         let texture_creator = canvas.texture_creator();
 
