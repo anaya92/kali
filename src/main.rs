@@ -2,8 +2,6 @@
 // for गाबीन <3
 extern crate sdl2;
 
-use std::convert::TryInto;
-
 // general
 use sdl2::event::Event;
 use sdl2::ttf::Sdl2TtfContext;
@@ -20,18 +18,18 @@ use sdl2::keyboard::KeyboardState;
 use sdl2::keyboard::Scancode;
 
 // program resources class
-struct ProgramResources {
-    atlas: Surface<'static>,
-    font: Font<'static, 'static>,
+struct ProgramResources<'a> {
+    atlas: Surface<'a>,
+    font: Font<'a, 'a>,
 }
 
-impl ProgramResources {
-    pub fn new(ttf_context: sdl2::ttf::Sdl2TtfContext) -> ProgramResources {
+impl ProgramResources<'static> {
+    pub fn new(ttf_context: &'_ sdl2::ttf::Sdl2TtfContext) -> ProgramResources {
         let atlas_bytes = include_bytes!("bin/atlas.bmp"); // im in love wtff its so easy to embed files
         let mut atlas_rwops = RWops::from_bytes(atlas_bytes).unwrap();
 
         let font_bytes = include_bytes!("bin/internal.ttf");
-        let mut font_rwops = RWops::from_bytes(font_bytes).unwrap();
+        let font_rwops = RWops::from_bytes(font_bytes).unwrap();
 
         ProgramResources {
             atlas: Surface::load_bmp_rw(&mut atlas_rwops).unwrap(),
@@ -56,20 +54,11 @@ impl Player {
 struct Core {
     sdl_context: sdl2::Sdl,
     ttf_context: Sdl2TtfContext,
-    resources: ProgramResources,
 }
 
 impl Core {
     pub fn new() -> Core {
-        let _ttf_context = sdl2::ttf::init().unwrap();
-
-        let core = Core { 
-            sdl_context: sdl2::init().unwrap(),
-            ttf_context: _ttf_context,
-            resources: ProgramResources::new(_ttf_context);
-        };
-
-        return core;
+        Core { sdl_context: sdl2::init().unwrap(), ttf_context: sdl2::ttf::init().unwrap() }
     }
 
     pub fn run(&self) {
@@ -84,13 +73,25 @@ impl Core {
         let mut canvas = window.into_canvas().build().unwrap();
         let texture_creator = canvas.texture_creator();
 
-        // load player + map
+        // resources
+        let resources = ProgramResources::new(&self.ttf_context);
+
+        // load player + map if needed
         let mut player = Player::new();
         player.x = 5;
         player.y = 5;
 
+        // prerender text
+        let text_surface = resources.font.render("<3")
+            .solid(Color::BLACK).unwrap();
+
+        // load stuff into gpu
         let atlas_minimap = texture_creator
-            .create_texture_from_surface(&self.resources.atlas)
+            .create_texture_from_surface(&resources.atlas)
+            .unwrap();
+
+        let text_texture = texture_creator
+            .create_texture_from_surface(&text_surface)
             .unwrap();
 
         // for events :p
@@ -107,9 +108,11 @@ impl Core {
                 }
             }
             let keyboard = KeyboardState::new(&event_pump); // input :3
+            if keyboard.is_scancode_pressed(Scancode::Escape) { break 'running; }
 
             canvas.clear();
             canvas.copy(&atlas_minimap, None, None).unwrap();
+            canvas.copy(&text_texture, None, Rect::new(10, 10, text_surface.width(), text_surface.height())).unwrap();
             canvas.present();
         }
     }
