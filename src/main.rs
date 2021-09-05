@@ -103,7 +103,7 @@ struct Player<'a> {
 
 impl Player<'_> {
     pub fn new(x: i32, y: i32) -> Player<'static> {
-        Player { x: x, y: y, sprite: Sprite::from_bytes(include_bytes!("bin/gabin.json")) }
+        Player { x: x, y: y, sprite: Sprite::from_bytes(include_bytes!("data/gabin.json")) }
     }
 }
 
@@ -159,11 +159,11 @@ impl Core {
         let atlas_texture: Texture2D;
 
         unsafe {
-            let atlas_filetype = std::ffi::CString::new(".png").unwrap();
-            let atlas_bytes = include_bytes!("bin/atlas.bmp");
+            let atlas_filetype: [char; 5] = ['.', 'p', 'n', 'g', '\0'];
+            let atlas_bytes = include_bytes!("data/atlas.png");
     
             let atlas_ffi_image = raylib::ffi::LoadImageFromMemory(
-                atlas_filetype.as_ptr(), 
+                atlas_filetype.as_ptr() as *const i8,
                 atlas_bytes as *const u8, 
                 atlas_bytes.len() as i32
             );
