@@ -1,0 +1,41 @@
+{
+    "name": "gabin :3",
+    "index": 0,
+    "animations": [
+        {
+            "name": "walk_down",
+            "speed": 10,
+            "array": [
+                
+            ]
+        },
+        {
+            "name": "walk_up",
+            "speed": 10,
+            "array": [
+                
+            ]
+        },
+        {
+            "name": "walk_left_right",
+            "speed": 10,
+            "array": [
+                
+            ]
+        },
+        {
+            "name": "walk_diag_down",
+            "speed": 10,
+            "array": [
+                
+            ]
+        },
+        {
+            "name": "walk_diag_up",
+            "speed": 10,
+            "array": [
+                
+            ]
+        }
+    ]
+}

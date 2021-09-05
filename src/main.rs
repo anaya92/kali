@@ -2,6 +2,8 @@
 // for गाबीन <3
 
 use raylib::prelude::*;
+use serde::*;
+use serde_json::*;
 
 // for ecs
 trait Entity {
@@ -9,9 +11,59 @@ trait Entity {
     fn draw(&self, draw_call: &mut RaylibMode2D<RaylibDrawHandle>);
 }
 
-// animation struct, kinda like the one from halcyon
-struct Animation {
-    
+// animation/sprite struct, kinda like the one from dvi/halcyon but in json
+// NOTE: these structs hold only data. something else has to provide a 
+// texture to be sourced from.
+
+// define new rectangle so it can be serializable
+// its identical to raylib's data wise.
+#[derive(Deserialize)]
+struct GabinRectangle {
+    x: f32,
+    y: f32,
+    width: f32,
+    height: f32
+}
+
+impl GabinRectangle {
+    pub fn to_rl_rect(&self) -> Rectangle {
+        Rectangle { x: self.x, y: self.y, width: self.width, height: self.height }
+    }
+}
+
+#[derive(Deserialize)]
+struct Animation<'a> {
+    name: &'a str,
+    speed: i32,
+    array: Vec<GabinRectangle>
+}
+
+impl Animation<'_> {
+    pub fn new(name: &str, speed: i32, array: Vec<GabinRectangle>) -> Animation<'_> {
+        Animation { name: name, speed: speed, array: array }
+    }
+}
+
+#[derive(Deserialize)]
+struct Sprite<'a> {
+    name: &'a str,
+    index: i32,
+    animations: Vec<Animation<'a>>
+}
+
+impl Sprite<'_> {
+    pub fn from_json_str(data: &'_ str) -> Sprite<'_> {
+        let value: Sprite = serde_json::from_str(data).unwrap();
+        return value;
+    }
+
+    pub fn width() -> i32 {
+        
+    }
+
+    pub fn height() -> i32 {
+        
+    }
 }
 
 // player struct :3
