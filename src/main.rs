@@ -138,7 +138,6 @@ impl Entity for Player<'_> {
     }
 
     fn draw(&self, core: *mut Core, draw_call: &mut RaylibMode2D<RaylibDrawHandle>) {
-        // println!("{}, {}", self.x, self.y);
         draw_call.draw_text("The Player", self.x, self.y, 24, Color::BLACK);
 
         unsafe {
@@ -160,11 +159,11 @@ impl Core {
         let atlas_texture: Texture2D;
 
         unsafe {
-            let atlas_filetype = ".bmp";
+            let atlas_filetype = std::ffi::CString::new(".png").unwrap();
             let atlas_bytes = include_bytes!("bin/atlas.bmp");
     
             let atlas_ffi_image = raylib::ffi::LoadImageFromMemory(
-                atlas_filetype.as_ptr() as *const i8, 
+                atlas_filetype.as_ptr(), 
                 atlas_bytes as *const u8, 
                 atlas_bytes.len() as i32
             );
