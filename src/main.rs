@@ -3,13 +3,6 @@
 
 use raylib::prelude::*;
 use serde::*;
-use serde_json::*;
-
-// for ecs
-trait Entity {
-    fn update(&mut self, rl: &RaylibHandle, core: *mut Core);
-    fn draw(&self, draw_call: &mut RaylibMode2D<RaylibDrawHandle>);
-}
 
 // animation/sprite struct, kinda like the one from dvi/halcyon but in json
 // NOTE: these structs hold only data. something else has to provide a 
@@ -38,16 +31,12 @@ struct Animation<'a> {
     array: Vec<GabinRectangle>
 }
 
-impl Animation<'_> {
-    pub fn new(name: &str, speed: i32, array: Vec<GabinRectangle>) -> Animation<'_> {
-        Animation { name: name, speed: speed, array: array }
-    }
-}
-
 #[derive(Deserialize)]
 struct Sprite<'a> {
-    name: &'a str,
-    index: i32,
+    pub name: &'a str,
+    animation_index: usize,
+    frame_index: usize,
+    ticks: i32,
     animations: Vec<Animation<'a>>
 }
 
@@ -57,32 +46,72 @@ impl Sprite<'_> {
         return value;
     }
 
-    pub fn width() -> i32 {
-        
+    pub fn from_bytes(bytes: &[u8]) -> Sprite<'_> {
+        let string = std::str::from_utf8(bytes).unwrap();
+        return Sprite::from_json_str(string);
     }
 
-    pub fn height() -> i32 {
-        
+    pub fn width(&self) -> i32 {
+        return self.animations[self.animation_index].array[self.frame_index].width as i32;
     }
+
+    pub fn height(&self) -> i32 {
+        return self.animations[self.animation_index].array[self.frame_index].height as i32;
+    }
+
+    fn get_current_animation(&self) -> &Animation {
+        return &self.animations[self.animation_index];
+    }
+
+    pub fn update(&mut self) // called by parent class or whatever
+    {
+        self.ticks += 1;
+
+        if (self.ticks % self.get_current_animation().speed) == 0 { 
+            self.frame_index += 1;
+        }
+
+        if self.frame_index > self.get_current_animation().array.len() - 1 {
+            self.frame_index = 0;
+        }
+    }
+
+    pub fn draw(&self, x: i32, y: i32, draw_call: &mut RaylibMode2D<RaylibDrawHandle>, atlas: &Texture2D) {
+        draw_call.draw_texture_pro(
+            atlas,
+            self.get_current_animation().array[self.frame_index].to_rl_rect(),
+            Rectangle { x: x as f32, y: y as f32, width: self.width() as f32, height: self.height() as f32 },
+            Vector2 { x: (self.width() / 2) as f32, y: (self.height() / 2) as f32 },
+            0.0,
+            Color::WHITE
+        )
+    }
+}
+
+// entity trait for ecs
+trait Entity {
+    fn update(&mut self, rl: &RaylibHandle, core: *mut Core);
+    fn draw(&self, core: *mut Core, draw_call: &mut RaylibMode2D<RaylibDrawHandle>);
 }
 
 // player struct :3
-struct Player {
+struct Player<'a> {
     x: i32,
-    y: i32
+    y: i32,
+    sprite: Sprite<'a>
 }
 
-impl Player {
-    pub fn new(x: i32, y: i32) -> Player {
-        Player { x: x, y: y }
+impl Player<'_> {
+    pub fn new(x: i32, y: i32) -> Player<'static> {
+        Player { x: x, y: y, sprite: Sprite::from_bytes(include_bytes!("bin/gabin.json")) }
     }
 }
 
-impl Entity for Player {
+impl Entity for Player<'_> {
     fn update(&mut self, rl: &RaylibHandle, core: *mut Core) {
         // get input, move, etc.
         use raylib::consts::KeyboardKey::*;
-        let movement_vel = 3;
+        let movement_vel = 2;
 
         if rl.is_key_down(KEY_UP) {
             self.y -= movement_vel;
@@ -100,33 +129,59 @@ impl Entity for Player {
             self.x += movement_vel;
         }
 
+        self.sprite.update();
+
         unsafe {
             let core_deref = &mut *core;
             core_deref.camera.target = Vector2::new(self.x as f32, self.y as f32);
         }
     }
 
-    fn draw(&self, draw_call: &mut RaylibMode2D<RaylibDrawHandle>) {
+    fn draw(&self, core: *mut Core, draw_call: &mut RaylibMode2D<RaylibDrawHandle>) {
         // println!("{}, {}", self.x, self.y);
         draw_call.draw_text("The Player", self.x, self.y, 24, Color::BLACK);
+
+        unsafe {
+            let core_deref = &*core;
+            self.sprite.draw(self.x, self.y, draw_call, &core_deref.atlas);
+        }
     }
 }
 
 // core struct holds stuff we need to keep (camera, etc.)
 // kinda acts like map struct
 struct Core {
-    camera: Camera2D
+    camera: Camera2D,
+    atlas: Texture2D
 }
 
 impl Core {
-    pub fn new(rl: &mut RaylibHandle) -> Core {
+    pub fn new(rl: &mut RaylibHandle, thread: &RaylibThread) -> Core {
+        let atlas_texture: Texture2D;
+
+        unsafe {
+            let atlas_filetype = ".bmp";
+            let atlas_bytes = include_bytes!("bin/atlas.bmp");
+    
+            let atlas_ffi_image = raylib::ffi::LoadImageFromMemory(
+                atlas_filetype.as_ptr() as *const i8, 
+                atlas_bytes as *const u8, 
+                atlas_bytes.len() as i32
+            );
+
+            let texture_temp = raylib::ffi::LoadTextureFromImage(atlas_ffi_image);
+
+            atlas_texture = Texture2D::from_raw(texture_temp);
+        }
+
         Core { 
             camera: Camera2D { 
                 offset: Vector2 { x: (rl.get_screen_height() / 2) as f32, y: (rl.get_screen_height() / 2) as f32 },
                 target: Vector2 { x: 0.0, y: 0.0 },
                 rotation: 0.0,
                 zoom: 1.0
-            }
+            },
+            atlas: atlas_texture
         }
     }
 }
@@ -140,7 +195,7 @@ fn main() {
     rl.set_target_fps(60);
 
     // define stuff we need to keep ahold of in core struct
-    let mut core = Core::new(&mut rl);
+    let mut core = Core::new(&mut rl, &thread);
     let player = Box::new(Player::new(0, 0)); // except boxed stuff cuz pointer rules smh
 
     // rudimentary ecs
@@ -164,7 +219,7 @@ fn main() {
             camera_draw_call.draw_text("asdf", 0, 0, 64, Color::BLUE);
 
             for entity in &mut entities {
-                entity.as_mut().draw(&mut camera_draw_call);
+                entity.as_mut().draw(&mut core, &mut camera_draw_call);
             }
         }
         

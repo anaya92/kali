@@ -1,40 +1,42 @@
 {
     "name": "gabin :3",
-    "index": 0,
+    "animation_index": 0,
+    "frame_index": 0,
+    "ticks": 0,
     "animations": [
         {
             "name": "walk_down",
             "speed": 10,
             "array": [
-                
+                { "x": 24.0, "y": 24.0, "width": 244.0, "height": 244.0 }
             ]
         },
         {
             "name": "walk_up",
             "speed": 10,
             "array": [
-                
+                { "x": 24.0, "y": 24.0, "width": 244.0, "height": 244.0 }
             ]
         },
         {
             "name": "walk_left_right",
             "speed": 10,
             "array": [
-                
+                { "x": 24.0, "y": 24.0, "width": 244.0, "height": 244.0 }
             ]
         },
         {
             "name": "walk_diag_down",
             "speed": 10,
             "array": [
-                
+                { "x": 24.0, "y": 24.0, "width": 244.0, "height": 244.0 }
             ]
         },
         {
             "name": "walk_diag_up",
             "speed": 10,
             "array": [
-                
+                { "x": 24.0, "y": 24.0, "width": 244.0, "height": 244.0 }
             ]
         }
     ]
