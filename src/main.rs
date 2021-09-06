@@ -33,7 +33,7 @@ struct Animation<'a> {
 
 #[derive(Deserialize)]
 struct Sprite<'a> {
-    pub name: &'a str,
+    name: &'a str,
     animation_index: usize,
     frame_index: usize,
     ticks: i32,
@@ -57,6 +57,15 @@ impl Sprite<'_> {
 
     pub fn height(&self) -> i32 {
         return self.animations[self.animation_index].array[self.frame_index].height as i32;
+    }
+
+    pub fn set_animation(&mut self, index: i32) {
+        self.frame_index = 0;
+        self.animation_index = index as usize;
+    }
+
+    pub fn get_animation_index(&mut self) -> i32 {
+        return self.animation_index as i32;
     }
 
     fn get_current_animation(&self) -> &Animation {
@@ -94,16 +103,54 @@ trait Entity {
     fn draw(&self, core: *mut Core, draw_call: &mut RaylibMode2D<RaylibDrawHandle>);
 }
 
+const DIRECTION_DOWN: i32 = 0;
+const DIRECTION_UP: i32 = 1;
+const DIRECTION_LEFT: i32 = 2;
+const DIRECTION_RIGHT: i32 = 3;
+const DIRECTION_LEFT_DOWN: i32 = 4;
+const DIRECTION_RIGHT_DOWN: i32 = 5;
+const DIRECTION_LEFT_UP: i32 = 6;
+const DIRECTION_RIGHT_UP: i32 = 7;
+
 // player struct :3
 struct Player<'a> {
     x: i32,
     y: i32,
+    direction: i32,
     sprite: Sprite<'a>
 }
 
 impl Player<'_> {
     pub fn new(x: i32, y: i32) -> Player<'static> {
-        Player { x: x, y: y, sprite: Sprite::from_bytes(include_bytes!("data/gabin.json")) }
+        Player { x: x, y: y, direction: DIRECTION_DOWN, sprite: Sprite::from_bytes(include_bytes!("data/gabin.json")) }
+    }
+
+    pub fn update_direction(&mut self, velocity: Vector2) {
+        if velocity.x > 0.0 { // right
+            if velocity.y > 0.0 { // right down
+                self.direction = DIRECTION_RIGHT_DOWN;
+            } if velocity.y < 0.0 { 
+                self.direction = DIRECTION_RIGHT_UP;
+            } else if velocity.y == 0.0 {
+                self.direction = DIRECTION_RIGHT;
+            }
+        } else if velocity.x < 0.0 { // left
+            if velocity.y > 0.0 {
+                self.direction = DIRECTION_LEFT_DOWN;
+            } if velocity.y < 0.0 { 
+                self.direction = DIRECTION_LEFT_UP;
+            } else if velocity.y == 0.0 {
+                self.direction = DIRECTION_LEFT;
+            }
+        } else if velocity.x == 0.0 { // vertical or none
+            if velocity.y > 0.0 {
+                self.direction = DIRECTION_DOWN;
+            } else if velocity.y < 0.0 {
+                self.direction = DIRECTION_UP;
+            } else if velocity.y == 0.0 {
+                
+            }
+        }
     }
 }
 
@@ -111,23 +158,37 @@ impl Entity for Player<'_> {
     fn update(&mut self, rl: &RaylibHandle, core: *mut Core) {
         // get input, move, etc.
         use raylib::consts::KeyboardKey::*;
-        let movement_vel = 2;
+        use raylib::consts::GamepadButton::*;
+        use raylib::consts::GamepadNumber::*;
+        let movement_speed = 2;
 
-        if rl.is_key_down(KEY_UP) {
-            self.y -= movement_vel;
+        let mut velocity = Vector2::new(0.0, 0.0);
+
+        // get input
+        if rl.is_key_down(KEY_DOWN) || rl.is_gamepad_button_down(GAMEPAD_PLAYER1, GAMEPAD_BUTTON_LEFT_FACE_DOWN) {
+            velocity.y += movement_speed as f32;
         }
 
-        if rl.is_key_down(KEY_DOWN) {
-            self.y += movement_vel;
+        if rl.is_key_down(KEY_UP) || rl.is_gamepad_button_down(GAMEPAD_PLAYER1, GAMEPAD_BUTTON_LEFT_FACE_UP) {
+            velocity.y -= movement_speed as f32;
         }
 
-        if rl.is_key_down(KEY_LEFT) {
-            self.x -= movement_vel;
+        if rl.is_key_down(KEY_LEFT) || rl.is_gamepad_button_down(GAMEPAD_PLAYER1, GAMEPAD_BUTTON_LEFT_FACE_LEFT) {
+            velocity.x -= movement_speed as f32;
         }
 
-        if rl.is_key_down(KEY_RIGHT) {
-            self.x += movement_vel;
+        if rl.is_key_down(KEY_RIGHT) || rl.is_gamepad_button_down(GAMEPAD_PLAYER1, GAMEPAD_BUTTON_LEFT_FACE_RIGHT) {
+            velocity.x += movement_speed as f32;
         }
+
+        self.update_direction(velocity);
+
+        if self.direction != self.sprite.animation_index as i32 {
+            self.sprite.set_animation(self.direction);
+        }
+
+        self.x += velocity.x as i32;
+        self.y += velocity.y as i32;
 
         self.sprite.update();
 
@@ -138,8 +199,6 @@ impl Entity for Player<'_> {
     }
 
     fn draw(&self, core: *mut Core, draw_call: &mut RaylibMode2D<RaylibDrawHandle>) {
-        draw_call.draw_text("The Player", self.x, self.y, 24, Color::BLACK);
-
         unsafe {
             let core_deref = &*core;
             self.sprite.draw(self.x, self.y, draw_call, &core_deref.atlas);
@@ -156,29 +215,29 @@ struct Core {
 
 impl Core {
     pub fn new(rl: &mut RaylibHandle, thread: &RaylibThread) -> Core {
-        let atlas_texture: Texture2D;
+        // let atlas_texture: Texture2D;
+        let atlas_texture = rl.load_texture(thread, "atlas.png").unwrap();
 
-        unsafe {
-            let atlas_filetype: [char; 5] = ['.', 'p', 'n', 'g', '\0'];
-            let atlas_bytes = include_bytes!("data/atlas.png");
+        // unsafe {
+        //     let atlas_bytes = include_bytes!("data/atlas.png");
     
-            let atlas_ffi_image = raylib::ffi::LoadImageFromMemory(
-                atlas_filetype.as_ptr() as *const i8,
-                atlas_bytes as *const u8, 
-                atlas_bytes.len() as i32
-            );
+        //     let atlas_ffi_image = raylib::ffi::LoadImageFromMemory(
+        //         ['.', 'p', 'n', 'g', '\0'].as_ptr() as *const i8,
+        //         atlas_bytes.as_ptr(), 
+        //         atlas_bytes.len() as i32
+        //     );
 
-            let texture_temp = raylib::ffi::LoadTextureFromImage(atlas_ffi_image);
+        //     let texture_temp = raylib::ffi::LoadTextureFromImage(atlas_ffi_image);
 
-            atlas_texture = Texture2D::from_raw(texture_temp);
-        }
+        //     atlas_texture = Texture2D::from_raw(texture_temp);
+        // }
 
         Core { 
             camera: Camera2D { 
                 offset: Vector2 { x: (rl.get_screen_height() / 2) as f32, y: (rl.get_screen_height() / 2) as f32 },
                 target: Vector2 { x: 0.0, y: 0.0 },
                 rotation: 0.0,
-                zoom: 1.0
+                zoom: 2.0
             },
             atlas: atlas_texture
         }
